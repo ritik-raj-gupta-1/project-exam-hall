@@ -13,7 +13,7 @@
 
         <div class="lobby-info">
             <p><strong>Room Code:</strong> <span id="room-code">{{ room_code }}</span></p>
-            <button class="btn btn-secondary" onclick="copyRoomCode()">Link Copy Karo</button>
+            <button class="btn btn-secondary" onclick="copyRoomCode()">Code Copy Karo</button>
         </div>
 
         <div class="player-list-container">
@@ -32,12 +32,10 @@
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script>
-        // Store room code and username from URL parameters
         const roomCode = document.getElementById('room-code').textContent;
         const urlParams = new URLSearchParams(window.location.search);
         const username = urlParams.get('username');
 
-        // Connect to the Socket.IO server
         const socket = io();
 
         socket.on('connect', () => {
@@ -60,13 +58,11 @@
             document.getElementById('ready-count').textContent = data.ready;
         });
         
-        // This button is only enabled for the host
         socket.on('enable_start_button', () => {
             document.getElementById('start-btn').disabled = false;
         });
         
         socket.on('game_start', () => {
-            // Redirect to the game page after roles are revealed
             window.location.href = `/game/${roomCode}`;
         });
 
@@ -82,8 +78,8 @@
         
         function copyRoomCode() {
             const roomCodeElement = document.getElementById('room-code');
-            navigator.clipboard.writeText(window.location.href).then(() => {
-                alert('Link copied to clipboard!');
+            navigator.clipboard.writeText(roomCodeElement.textContent).then(() => {
+                alert('Room code copied! Share it with your friends.');
             });
         }
     </script>

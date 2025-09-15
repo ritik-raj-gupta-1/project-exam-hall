@@ -87,3 +87,32 @@ input[type="text"] {
 
 /* Add more styles for lobby, game, etc. */
 /* You would need to add CSS for different states here */
+
+/* Announcements Overlay */
+.announcement-area {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.8);
+    color: var(--text-color);
+    padding: 1.5rem 2rem;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+    min-width: 300px;
+    text-align: center;
+}
+
+.announcement-area.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+#announcement-text {
+    font-size: 1.5rem;
+    font-weight: bold;
+}

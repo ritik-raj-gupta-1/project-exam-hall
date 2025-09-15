@@ -103,21 +103,19 @@
             }, 3000); // 3-second delay for dramatic effect
         });
 
-        socket.on('update_players', (data) => {
-            const playerList = document.getElementById('player-options');
-            if (!playerList) return; // Invigilator screen only
+        socket.on('update_player_options', (data) => {
+            const playerOptionsList = document.getElementById('player-options');
+            if (!playerOptionsList) return; 
             
-            playerList.innerHTML = '';
+            playerOptionsList.innerHTML = '';
             data.players.forEach(player => {
-                if (player !== username) {
-                    const li = document.createElement('li');
-                    li.textContent = player;
-                    li.classList.add('player-option');
-                    li.addEventListener('click', () => {
-                        socket.emit('make_guess', { guesser: username, target: player, room_code: roomCode });
-                    });
-                    playerList.appendChild(li);
-                }
+                const li = document.createElement('li');
+                li.textContent = player;
+                li.classList.add('player-option');
+                li.addEventListener('click', () => {
+                    socket.emit('make_guess', { guesser: username, target: player, room_code: roomCode });
+                });
+                playerOptionsList.appendChild(li);
             });
         });
 
