@@ -20,7 +20,7 @@
             <h2 class="list-title">Players Joined:</h2>
             <ul id="player-list" class="player-list">
                 </ul>
-            <p id="player-count">Players: <span id="current-count">0</span>/6</p>
+            <p id="player-count">Players: <span id="current-count">0</span></p>
         </div>
         
         <div class="ready-container">
@@ -69,7 +69,6 @@
             
             if (socket.id === data.host_sid) {
                 startBtn.classList.remove('hidden');
-                // The host always starts in a "ready" state from a UX perspective
                 readyBtn.classList.add('hidden');
             } else {
                 startBtn.classList.add('hidden');
@@ -79,7 +78,6 @@
 
         socket.on('ready_status', (data) => {
             document.getElementById('ready-count').textContent = data.ready;
-            // Provide a clear message to the host about the ready status
             if (socket.id === data.host_sid) {
                  if (data.total < 3) {
                     statusMessage.textContent = 'Minimum 3 players required.';
@@ -119,7 +117,9 @@
             readyBtn.textContent = 'Ready!';
         });
 
+        // Add a console log here to confirm the click event is being captured
         startBtn.addEventListener('click', () => {
+            console.log('Start button clicked, emitting start_game_request');
             socket.emit('start_game_request', { room_code: roomCode });
         });
         
