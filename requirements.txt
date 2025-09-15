@@ -1,0 +1,6 @@
+flask
+flask-socketio
+python-dotenv
+psycopg2-binary
+gevent
+gevent-websocket

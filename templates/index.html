@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project: Exam Hall</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Project: Exam Hall</h1>
+        <p class="tagline">Saare students shaant hain, par koi ek... Cheater hai.</p>
+        <form id="name-form">
+            <input type="text" id="name-input" placeholder="Apna Naam Batao" required maxlength="15">
+            <div class="button-group">
+                <button type="submit" formaction="/create_game" formmethod="post" class="btn btn-primary">Game Banayein</button>
+                <button type="button" class="btn btn-secondary" onclick="showJoinInput()">Join Karein</button>
+            </div>
+        </form>
+        <form id="join-form" style="display:none;">
+            <input type="text" id="room-code-input" placeholder="Room Code Daalo" required maxlength="6">
+            <button type="submit" class="btn btn-primary">Join Karein</button>
+        </form>
+    </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>

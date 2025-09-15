@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game | Project: Exam Hall</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container game-container">
+        <div id="role-reveal-screen" class="screen active">
+            <h1 id="role-title">...</h1>
+            <p id="role-description">Wait for your role to be revealed...</p>
+        </div>
+
+        <div id="game-screen" class="screen hidden">
+            <div class="timer-container">
+                <span id="timer">90</span> <span class="timer-label">seconds</span>
+            </div>
+
+            <div id="role-info" class="role-info">
+                </div>
+
+            <div id="announcement-area" class="announcement-area">
+                <p id="announcement-text"></p>
+            </div>
+
+            <div id="game-content">
+                <div id="cheater-info" class="game-info hidden">
+                    <p>Chup Chaap Baithe Raho! Invigilator inspection kar raha hai.</p>
+                </div>
+                
+                <div id="invigilator-info" class="game-info hidden">
+                    <h2 class="list-title">Kon Cheater Hai?</h2>
+                    <ul id="player-options" class="player-options-list">
+                        </ul>
+                </div>
+
+                <div id="student-info" class="game-info hidden">
+                    <p>Bus paper solve karo! Koshish karo Invigilator se pakde na jao.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="result-screen" class="screen hidden">
+            <h1 id="result-title"></h1>
+            <p id="result-message"></p>
+            <button class="btn btn-primary" onclick="window.location.href='/'">Naya Game</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        const roomCode = window.location.pathname.split('/').pop();
+        const username = sessionStorage.getItem('username');
+        const socket = io();
+
+        // --- UI Elements ---
+        const roleRevealScreen = document.getElementById('role-reveal-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const announcementArea = document.getElementById('announcement-area');
+        
+        // --- Socket.IO Event Listeners ---
+        socket.on('connect', () => {
+            console.log('Connected to server. Joining game...');
+            // Re-join the room for the game phase
+            socket.emit('join_game', { username: username, room_code: roomCode });
+        });
+
+        socket.on('role_reveal', (data) => {
+            const role = data.role;
+            document.getElementById('role-title').textContent = role;
+            
+            // Show role-specific instructions
+            let description = '';
+            if (role === 'Cheater') {
+                description = "Shhh! Tum Cheater ho. Invigilator se bachke rehna!";
+            } else if (role === 'Invigilator') {
+                description = "Pakdo usko! Tum Invigilator ho. 90 seconds mein Cheater ko dhoondo.";
+            } else if (role === 'VC') {
+                description = "Sabse Bada Aadmi. Aap Vice Chancellor hain.";
+            } else {
+                description = "Bus paper solve karo! Koshish karo Invigilator se pakde na jao.";
+            }
+            document.getElementById('role-description').textContent = description;
+            
+            // Transition to game screen after a brief delay
+            setTimeout(() => {
+                roleRevealScreen.classList.remove('active');
+                roleRevealScreen.classList.add('hidden');
+                gameScreen.classList.remove('hidden');
+                gameScreen.classList.add('active');
+                
+                // Show role-specific content
+                if (role === 'Invigilator') {
+                    document.getElementById('invigilator-info').classList.remove('hidden');
+                } else if (role === 'Cheater') {
+                    document.getElementById('cheater-info').classList.remove('hidden');
+                } else {
+                    document.getElementById('student-info').classList.remove('hidden');
+                }
+            }, 3000); // 3-second delay for dramatic effect
+        });
+
+        socket.on('update_players', (data) => {
+            const playerList = document.getElementById('player-options');
+            if (!playerList) return; // Invigilator screen only
+            
+            playerList.innerHTML = '';
+            data.players.forEach(player => {
+                if (player !== username) {
+                    const li = document.createElement('li');
+                    li.textContent = player;
+                    li.classList.add('player-option');
+                    li.addEventListener('click', () => {
+                        socket.emit('make_guess', { guesser: username, target: player, room_code: roomCode });
+                    });
+                    playerList.appendChild(li);
+                }
+            });
+        });
+
+        socket.on('timer_update', (data) => {
+            document.getElementById('timer').textContent = data.time_left;
+        });
+
+        socket.on('game_over', (data) => {
+            gameScreen.classList.remove('active');
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            resultScreen.classList.add('active');
+            
+            document.getElementById('result-title').textContent = 'Game Over';
+            document.getElementById('result-message').textContent = data.result;
+        });
+
+        socket.on('message', (data) => {
+            // Display dynamic announcements
+            const announcementText = document.getElementById('announcement-text');
+            announcementText.textContent = data.msg;
+            announcementArea.classList.add('active');
+            setTimeout(() => {
+                announcementArea.classList.remove('active');
+            }, 3000);
+        });
+    </script>
+</body>
+</html>

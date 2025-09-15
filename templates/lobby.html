@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lobby | Project: Exam Hall</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container lobby-container">
+        <h1 class="title">Exam Hall Lobby</h1>
+        <p class="tagline">Doston ka intezaar hai...</p>
+
+        <div class="lobby-info">
+            <p><strong>Room Code:</strong> <span id="room-code">{{ room_code }}</span></p>
+            <button class="btn btn-secondary" onclick="copyRoomCode()">Link Copy Karo</button>
+        </div>
+
+        <div class="player-list-container">
+            <h2 class="list-title">Players Joined:</h2>
+            <ul id="player-list" class="player-list">
+                </ul>
+        </div>
+        
+        <div class="ready-container">
+            <p>Ready Players: <span id="ready-count">0</span>/<span id="total-count">0</span></p>
+            <button id="ready-btn" class="btn btn-secondary">Ready Hain?</button>
+        </div>
+
+        <button id="start-btn" class="btn btn-primary" disabled>Game Shuru Karein</button>
+
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script>
+        // Store room code and username from URL parameters
+        const roomCode = document.getElementById('room-code').textContent;
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+
+        // Connect to the Socket.IO server
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log('Connected to server. Joining room...');
+            socket.emit('join_game', { username: username, room_code: roomCode });
+        });
+
+        socket.on('update_players', (data) => {
+            const playerList = document.getElementById('player-list');
+            playerList.innerHTML = '';
+            data.players.forEach(player => {
+                const li = document.createElement('li');
+                li.textContent = player;
+                playerList.appendChild(li);
+            });
+            document.getElementById('total-count').textContent = data.players.length;
+        });
+
+        socket.on('ready_status', (data) => {
+            document.getElementById('ready-count').textContent = data.ready;
+        });
+        
+        // This button is only enabled for the host
+        socket.on('enable_start_button', () => {
+            document.getElementById('start-btn').disabled = false;
+        });
+        
+        socket.on('game_start', () => {
+            // Redirect to the game page after roles are revealed
+            window.location.href = `/game/${roomCode}`;
+        });
+
+        document.getElementById('ready-btn').addEventListener('click', () => {
+            socket.emit('set_ready', { username: username, room_code: roomCode });
+            document.getElementById('ready-btn').disabled = true;
+            document.getElementById('ready-btn').textContent = 'Ready!';
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            socket.emit('start_game_request', { room_code: roomCode });
+        });
+        
+        function copyRoomCode() {
+            const roomCodeElement = document.getElementById('room-code');
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                alert('Link copied to clipboard!');
+            });
+        }
+    </script>
+</body>
+</html>
