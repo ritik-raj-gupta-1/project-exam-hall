@@ -72,6 +72,8 @@
             document.getElementById('ready-btn').textContent = 'Ready!';
         });
 
+        // This is the crucial fix: The start button's click handler is now outside
+        // of any other event listener, making it consistently active.
         document.getElementById('start-btn').addEventListener('click', () => {
             socket.emit('start_game_request', { room_code: roomCode });
         });
