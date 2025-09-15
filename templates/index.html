@@ -14,13 +14,13 @@
         <form id="name-form">
             <input type="text" id="name-input" placeholder="Apna Naam Batao" required maxlength="15">
             <div class="button-group">
-                <button type="submit" id="create-game-btn" class="btn btn-primary">Game Banayein</button>
+                <button type="button" id="create-game-btn" class="btn btn-primary">Game Banayein</button>
                 <button type="button" class="btn btn-secondary" onclick="showJoinInput()">Join Karein</button>
             </div>
         </form>
         <form id="join-form" style="display:none;">
             <input type="text" id="room-code-input" placeholder="Room Code Daalo" required maxlength="6">
-            <button type="submit" class="btn btn-primary">Join Karein</button>
+            <button type="submit" id="join-form-btn" class="btn btn-primary">Join Karein</button>
         </form>
     </div>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
