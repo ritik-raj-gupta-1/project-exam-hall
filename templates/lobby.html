@@ -20,14 +20,20 @@
             <h2 class="list-title">Players Joined:</h2>
             <ul id="player-list" class="player-list">
                 </ul>
+            <p id="player-count">Players: <span id="current-count">0</span>/6</p>
         </div>
         
         <div class="ready-container">
             <p>Ready Players: <span id="ready-count">0</span>/<span id="total-count">0</span></p>
             <button id="ready-btn" class="btn btn-secondary">Ready Hain?</button>
+            <p id="status-message" class="hidden"></p>
         </div>
 
-        <button id="start-btn" class="btn btn-primary" disabled>Game Shuru Karein</button>
+        <button id="start-btn" class="btn btn-primary hidden" disabled>Game Shuru Karein</button>
+        
+        <div id="announcement-area" class="announcement-area hidden">
+            <p id="announcement-text"></p>
+        </div>
 
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
@@ -36,7 +42,14 @@
         const urlParams = new URLSearchParams(window.location.search);
         const username = urlParams.get('username');
 
+        // Store username in session storage for persistence between pages
+        sessionStorage.setItem('username', username);
+
         const socket = io();
+        const startBtn = document.getElementById('start-btn');
+        const readyBtn = document.getElementById('ready-btn');
+        const announcementArea = document.getElementById('announcement-area');
+        const statusMessage = document.getElementById('status-message');
 
         socket.on('connect', () => {
             console.log('Connected to server. Joining room...');
@@ -52,29 +65,61 @@
                 playerList.appendChild(li);
             });
             document.getElementById('total-count').textContent = data.players.length;
+            document.getElementById('current-count').textContent = data.players.length;
+            
+            if (socket.id === data.host_sid) {
+                startBtn.classList.remove('hidden');
+                // The host always starts in a "ready" state from a UX perspective
+                readyBtn.classList.add('hidden');
+            } else {
+                startBtn.classList.add('hidden');
+                readyBtn.classList.remove('hidden');
+            }
         });
 
         socket.on('ready_status', (data) => {
             document.getElementById('ready-count').textContent = data.ready;
+            // Provide a clear message to the host about the ready status
+            if (socket.id === data.host_sid) {
+                 if (data.total < 3) {
+                    statusMessage.textContent = 'Minimum 3 players required.';
+                    statusMessage.classList.remove('hidden');
+                 } else if (data.ready < data.total) {
+                    statusMessage.textContent = `${data.total - data.ready} more player(s) to go!`;
+                    statusMessage.classList.remove('hidden');
+                 } else {
+                    statusMessage.classList.add('hidden');
+                 }
+            }
         });
         
         socket.on('enable_start_button', () => {
-            document.getElementById('start-btn').disabled = false;
+            startBtn.disabled = false;
+        });
+
+        socket.on('disable_start_button', () => {
+            startBtn.disabled = true;
+        });
+
+        socket.on('game_full', (data) => {
+             displayAnnouncement(data.message);
         });
         
         socket.on('game_start', () => {
             window.location.href = `/game/${roomCode}`;
         });
 
-        document.getElementById('ready-btn').addEventListener('click', () => {
-            socket.emit('set_ready', { username: username, room_code: roomCode });
-            document.getElementById('ready-btn').disabled = true;
-            document.getElementById('ready-btn').textContent = 'Ready!';
+        socket.on('message', (data) => {
+            displayAnnouncement(data.msg);
         });
 
-        // This is the crucial fix: The start button's click handler is now outside
-        // of any other event listener, making it consistently active.
-        document.getElementById('start-btn').addEventListener('click', () => {
+        readyBtn.addEventListener('click', () => {
+            socket.emit('set_ready', { username: username, room_code: roomCode });
+            readyBtn.disabled = true;
+            readyBtn.textContent = 'Ready!';
+        });
+
+        startBtn.addEventListener('click', () => {
             socket.emit('start_game_request', { room_code: roomCode });
         });
         
@@ -83,6 +128,15 @@
             navigator.clipboard.writeText(roomCodeElement.textContent).then(() => {
                 alert('Room code copied! Share it with your friends.');
             });
+        }
+
+        function displayAnnouncement(message) {
+            const announcementText = document.getElementById('announcement-text');
+            announcementText.textContent = message;
+            announcementArea.classList.remove('hidden');
+            setTimeout(() => {
+                announcementArea.classList.add('hidden');
+            }, 3000);
         }
     </script>
 </body>

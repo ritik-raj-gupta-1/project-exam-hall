@@ -4,7 +4,7 @@ import json
 import time
 from threading import Thread
 from flask import Flask, render_template, request, redirect, url_for, jsonify
-from flask_socketio import SocketIO, join_room, emit
+from flask_socketio import SocketIO, join_room, emit, leave_room
 from dotenv import load_dotenv
 from database import get_db_connection, put_db_connection
 import uuid
@@ -18,7 +18,6 @@ app.config['SECRET_KEY'] = os.getenv("SUPABASE_KEY")
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 # Global state for active games
-# Use a class for better encapsulation and to prevent race conditions on state
 game_rooms = {}
 
 ROLES = ['VC', 'Professor', 'Invigilator', 'Cheater', 'Student', 'Student']
@@ -32,11 +31,15 @@ class GameRoom:
         self.timer_thread = None
 
     def add_player(self, username, sid):
+        if len(self.players) >= 6:
+            # Game is full, refuse to add player
+            socketio.emit('game_full', {'message': 'Game is full! Cannot join.'}, room=sid)
+            return
+
         if username not in self.players:
             self.players[username] = {'sid': sid, 'role': None, 'ready': False}
-            # Broadcast the updated player list to the lobby
-            player_list = list(self.players.keys())
-            socketio.emit('update_players', {'players': player_list}, room=self.room_code)
+            
+            socketio.emit('update_players', {'players': list(self.players.keys()), 'host_sid': self.host_sid}, room=self.room_code)
             socketio.emit('message', {'msg': f'{username} has joined.'}, room=self.room_code)
             self.check_ready_status()
             
@@ -44,10 +47,30 @@ class GameRoom:
         if username in self.players:
             del self.players[username]
             socketio.emit('message', {'msg': f'{username} has left.'}, room=self.room_code)
-            player_list = list(self.players.keys())
-            socketio.emit('update_players', {'players': player_list}, room=self.room_code)
+            
+            if len(self.players) == 0:
+                # If the last player leaves, delete the room
+                if self.room_code in game_rooms:
+                    del game_rooms[self.room_code]
+                    print(f"Room {self.room_code} deleted as it is empty.")
+                return
+
+            # Reassign host if the current host left
+            if username == self.get_host_username():
+                new_host_name = list(self.players.keys())[0]
+                self.host_sid = self.players[new_host_name]['sid']
+                print(f"New host for room {self.room_code} is {new_host_name}.")
+
+            # Broadcast host_sid to the remaining players
+            socketio.emit('update_players', {'players': list(self.players.keys()), 'host_sid': self.host_sid}, room=self.room_code)
             self.check_ready_status()
-    
+
+    def get_host_username(self):
+        for name, data in self.players.items():
+            if data['sid'] == self.host_sid:
+                return name
+        return None
+
     def set_ready(self, username):
         if username in self.players:
             self.players[username]['ready'] = True
@@ -58,14 +81,17 @@ class GameRoom:
         total_count = len(self.players)
         socketio.emit('ready_status', {'ready': ready_count, 'total': total_count}, room=self.room_code)
         
-        # Check if all players are ready and if the host should be enabled to start
-        if total_count >= 3 and ready_count == total_count:
+        if 3 <= total_count <= 6 and ready_count == total_count:
             socketio.emit('enable_start_button', room=self.host_sid)
+        else:
+            socketio.emit('disable_start_button', room=self.host_sid)
 
     def start_game(self):
-        if self.state == 'lobby' and len(self.players) >= 3:
+        if self.state == 'lobby' and 3 <= len(self.players) <= 6:
             self.state = 'in_progress'
             players = list(self.players.keys())
+            
+            # Use random.sample to get a unique list of roles of the required size
             available_roles = random.sample(ROLES, len(players))
 
             for player_name, role in zip(players, available_roles):
@@ -73,20 +99,20 @@ class GameRoom:
                 sid = self.players[player_name]['sid']
                 socketio.emit('role_reveal', {'role': role}, room=sid)
 
-            # Send player list to Invigilator after roles are assigned
             players_list = list(self.players.keys())
             for player_name, player_data in self.players.items():
                 if player_data['role'] == 'Invigilator':
                     other_players = [p for p in players_list if p != player_name]
                     socketio.emit('update_player_options', {'players': other_players}, room=player_data['sid'])
 
-            # Start the timer as a background task using a Thread
             self.timer_thread = Thread(target=self.game_timer, args=(90,))
             self.timer_thread.daemon = True
             self.timer_thread.start()
-
+            
+            socketio.emit('game_start', room=self.room_code)
             return {"status": "success"}
-        return {"status": "error", "message": "Not enough players to start."}
+        
+        return {"status": "error", "message": "Incorrect number of players to start."}
 
     def game_timer(self, duration):
         for i in range(duration, 0, -1):
@@ -114,7 +140,7 @@ class GameRoom:
         
         self.state = 'finished'
         if self.timer_thread and self.timer_thread.is_alive():
-            self.timer_thread = None # Stop the timer loop
+            self.timer_thread = None
 
     def log_game_result(self, winner_role, result_type):
         conn = None
@@ -141,7 +167,7 @@ def index():
 @app.route('/create_game', methods=['POST'])
 def create_game():
     room_code = str(uuid.uuid4())[:6].upper()
-    game_rooms[room_code] = GameRoom(room_code, None) # The host SID will be set on join
+    game_rooms[room_code] = GameRoom(room_code, None) 
     return jsonify({"room_code": room_code, "link": f"/lobby/{room_code}"})
 
 @app.route('/lobby/<room_code>')
@@ -169,7 +195,6 @@ def handle_join_game(data):
         return
     
     game = game_rooms[room_code]
-    # Set the host SID for the first player to join
     if not game.host_sid:
         game.host_sid = sid
         
@@ -190,11 +215,10 @@ def handle_start_game_request(data):
     sid = request.sid
     if room_code in game_rooms:
         game = game_rooms[room_code]
-        # Security check: only allow the host to start the game
         if sid == game.host_sid:
             game.start_game()
         else:
-            emit('message', {'msg': 'Only the host can start the game.'})
+            emit('message', {'msg': 'Only the host can start the game.'}, room=sid)
 
 @socketio.on('make_guess')
 def handle_make_guess(data):
@@ -213,8 +237,7 @@ def handle_disconnect():
             if player_data['sid'] == sid:
                 game.remove_player(player_name)
                 print(f"Player {player_name} disconnected from room {room_code}.")
-                # If the host disconnects, delete the room
-                if sid == game.host_sid:
-                    print(f"Host disconnected. Deleting room {room_code}.")
-                    del game_rooms[room_code]
                 return
+
+if __name__ == '__main__':
+    socketio.run(app, host='0.0.0.0', port=os.environ.get('PORT', 5000), allow_unsafe_werkzeug=True)

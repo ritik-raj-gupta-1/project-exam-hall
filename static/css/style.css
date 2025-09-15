@@ -116,3 +116,9 @@ input[type="text"] {
     font-size: 1.5rem;
     font-weight: bold;
 }
+/* style.css */
+/* ... (existing styles) ... */
+
+.hidden {
+    display: none !important;
+}
