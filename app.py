@@ -242,6 +242,3 @@ def handle_disconnect():
                 print(f"Player {player_name} disconnected from room {room_code}.")
                 return
 
-if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
